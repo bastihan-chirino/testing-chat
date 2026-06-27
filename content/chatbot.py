@@ -39,13 +39,11 @@ DOCUMENT_UPLOAD_ENABLED = STARTUP_OPTIONS.enable_document_upload
 st.set_page_config(page_title="Chatbot IA", page_icon="🤖")
 st.title("Mi Chatbot de Investigación con IA")
 st.warning(
-    "IMPORTANTE: no ingreses datos personales, confidenciales o sensibles en este chat. "
-    "Evita compartir RUT/DNI, correos, teléfonos, direcciones, claves, datos bancarios, "
-    "información médica o documentos con información privada."
-)
-st.caption(
-    "El chatbot usa Gemini para asistencia en análisis de documentos y conversación. "
-    "Revisa y anonimiza la información antes de enviarla."
+    "Este chatbot utiliza inteligencia artificial para generar respuestas y asistir en distintas tareas.\n\n"
+    "Las conversaciones pueden ser almacenadas y utilizadas de forma agregada para fines de mejora del sistema, "
+    "análisis estadístico y desarrollo de modelos.\n\n"
+    "Se recomienda no compartir información personal sensible o datos que no desees que sean procesados por el sistema.\n\n"
+    "Al continuar utilizando el chatbot, aceptas estas condiciones de uso."
 )
 
 st.markdown(
@@ -241,6 +239,16 @@ PII_TYPE_LABELS = {
     "URL": "URL",
     "DNI/NIE": "DNI/NIE",
     "IBAN": "IBAN / cuenta bancaria",
+    "RUT": "RUT chileno",
+    "MATRICULA": "Código de matrícula",
+    "MEDICAL_FOLIO": "Folio de certificado médico",
+    "DOC_REF": "Código de documento institucional",
+    "DOCTOR_REGISTRY": "Registro médico",
+    "STUDENT_NAME": "Nombre de estudiante",
+    "DOCTOR_NAME": "Nombre de médico",
+    "SOCIAL_WORKER_NAME": "Nombre de asistente social",
+    "ADDRESS": "Dirección/Domicilio",
+    "PHONE_NUMBER_CL": "Teléfono",
 }
 
 
@@ -254,13 +262,17 @@ def get_high_confidence_pii_types(pii_check: dict) -> list[str]:
     return [PII_TYPE_LABELS.get(entity_type, entity_type) for entity_type in types_found]
 
 
-def render_pii_warning(pii_check: dict) -> None:
+def render_pii_warning(pii_check: dict, original_prompt: str = "") -> None:
     high_confidence_types = get_high_confidence_pii_types(pii_check)
 
     st.error(
         "❌ Se detectó información sensible en tu mensaje. "
         "Puedes decidir si deseas enviarlo de todas formas."
     )
+
+    if original_prompt:
+        with st.expander("Ver mensaje original", expanded=True):
+            st.code(original_prompt, language=None)
 
     if high_confidence_types:
         st.warning(
@@ -301,7 +313,7 @@ elif st.session_state.pending_prompt:
         "entities": [],
         "debug": "desconocido",
     }
-    render_pii_warning(pii_check)
+    render_pii_warning(pii_check, st.session_state.pending_prompt)
 
     if st.button("Enviar de todas formas", key="allow_pii_send", type="primary"):
         prompt_to_send = st.session_state.pending_prompt
@@ -338,7 +350,7 @@ elif should_process_new_prompt(prompt, st.session_state.pending_prompt):
             },
             st.session_state.conversation_file_path,
         )
-        render_pii_warning(pii_check)
+        render_pii_warning(pii_check, prompt)
 
         if st.button("Enviar de todas formas", key="allow_pii_send", type="primary"):
             prompt_to_send = st.session_state.pending_prompt
