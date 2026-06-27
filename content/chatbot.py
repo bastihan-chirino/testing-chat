@@ -14,7 +14,17 @@ from conversation_store import (
 from document_processor import extract_text_from_file, format_documents_context
 from pii_detector import check_documents_pii, detect_pii
 from prompt_handler import decide_prompt_action, should_process_new_prompt
+import os
+import spacy
+import streamlit as st
 
+# Asegurar que el modelo en español esté descargado e instalado
+try:
+    nlp = spacy.load("es_core_news_sm")
+except OSError:
+    # Si no lo encuentra, lo descarga dinámicamente en el entorno del usuario
+    os.system("python -m spacy download es_core_news_sm")
+    nlp = spacy.load("es_core_news_sm")
 
 def parse_startup_options() -> argparse.Namespace:
     parser = argparse.ArgumentParser(add_help=False)
