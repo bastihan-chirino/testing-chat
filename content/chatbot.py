@@ -118,15 +118,9 @@ if "pending_pii_check" not in st.session_state:
 
 
 st.sidebar.header("📄 Documentos")
-st.sidebar.info(f"Conversaciones guardadas en: {st.session_state.conversation_file_path}")
 if not PII_WARNINGS_ENABLED:
     st.sidebar.warning("Advertencias emergentes de PII desactivadas por parámetro de inicio.")
-if not DOCUMENT_UPLOAD_ENABLED:
-    st.sidebar.info(
-        "La subida de documentos está deshabilitada. "
-        "Inicia la app con --enable-document-upload para activarla."
-    )
-else:
+if DOCUMENT_UPLOAD_ENABLED:
     uploaded_files = st.sidebar.file_uploader(
         "Sube documentos (TXT, PDF, DOCX)",
         type=["txt", "pdf", "docx", "md"],
@@ -249,6 +243,10 @@ PII_TYPE_LABELS = {
     "SOCIAL_WORKER_NAME": "Nombre de asistente social",
     "ADDRESS": "Dirección/Domicilio",
     "PHONE_NUMBER_CL": "Teléfono",
+    "PERSON": "Nombre de persona",
+    "PER": "Nombre de persona",
+    "LOCATION": "Ubicación geográfica",
+    "LOC": "Ubicación geográfica",
 }
 
 
@@ -256,7 +254,7 @@ def get_high_confidence_pii_types(pii_check: dict) -> list[str]:
     high_confidence_entities = [
         entity
         for entity in pii_check.get("entities", [])
-        if entity.get("score", 0) > HIGH_CONFIDENCE_THRESHOLD
+        if entity.get("score", 0) >= HIGH_CONFIDENCE_THRESHOLD
     ]
     types_found = sorted({entity["type"] for entity in high_confidence_entities})
     return [PII_TYPE_LABELS.get(entity_type, entity_type) for entity_type in types_found]

@@ -76,6 +76,17 @@ class PiiChecksTests(unittest.TestCase):
         self.assertTrue(res["found"])
         entity_types = {e["type"] for e in res["entities"]}
         self.assertIn("PHONE_NUMBER_CL", entity_types)
+    def test_detects_general_name(self) -> None:
+        res = detect_pii("Hola, mi nombre es Juan Pérez")
+        self.assertTrue(res["found"])
+        entity_types = {e["type"] for e in res["entities"]}
+        self.assertIn("PERSON", entity_types)
+
+    def test_detects_general_location(self) -> None:
+        res = detect_pii("Viajo a Madrid mañana")
+        self.assertTrue(res["found"])
+        entity_types = {e["type"] for e in res["entities"]}
+        self.assertIn("LOCATION", entity_types)
 
 
 if __name__ == "__main__":

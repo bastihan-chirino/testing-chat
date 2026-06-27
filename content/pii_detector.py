@@ -217,6 +217,10 @@ def build_presidio_analyzer() -> Optional[object]:
         social_worker_pattern = Pattern(name="social_worker", regex=r"\bPatricia\s+G(?:ó|o)mez\b", score=1.0)
         address_pattern = Pattern(name="address", regex=r"\bAvenida\s+Los\s+Pajaritos\s+4320\b|\bLos\s+Pajaritos\s+4320\b", score=1.0)
         phone_cl_pattern = Pattern(name="phone_cl", regex=r"\+56\s*9\s*\d{4}\s*\d{4}\b|\b9\s*\d{4}\s*\d{4}\b", score=1.0)
+        
+        # Patrones para DNI/NIE e IBAN
+        dni_pattern = Pattern(name="dni_nie", regex=r"\b\d{7,8}[A-Z]?\b", score=1.0)
+        iban_pattern = Pattern(name="iban", regex=r"\b[A-Z]{2}\d{2}[A-Z0-9]{4,30}\b", score=1.0)
 
         for lang in supported_languages:
             analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="RUT", patterns=[rut_pattern], supported_language=lang))
@@ -229,11 +233,21 @@ def build_presidio_analyzer() -> Optional[object]:
             analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="SOCIAL_WORKER_NAME", patterns=[social_worker_pattern], supported_language=lang))
             analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="ADDRESS", patterns=[address_pattern], supported_language=lang))
             analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="PHONE_NUMBER_CL", patterns=[phone_cl_pattern], supported_language=lang))
+            analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="DNI/NIE", patterns=[dni_pattern], supported_language=lang))
+            analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="IBAN", patterns=[iban_pattern], supported_language=lang))
 
         return analyzer
     except Exception as e:
         print(f"Error al inicializar el analizador de Presidio: {e}")
         return None
+
+
+def get_entity_priority(entity_type: str) -> int:
+    """Retorna la prioridad de la entidad: menor valor es mayor prioridad."""
+    # Las entidades genéricas de NER tienen menor prioridad
+    if entity_type in {"PERSON", "LOCATION", "ORG", "PER", "LOC"}:
+        return 2
+    return 1
 
 
 def detect_pii(texto: str) -> Dict[str, Any]:
@@ -250,6 +264,10 @@ def detect_pii(texto: str) -> Dict[str, Any]:
                 "CREDIT_CARD",
                 "IP_ADDRESS",
                 "URL",
+                "PERSON",
+                "LOCATION",
+                "DNI/NIE",
+                "IBAN",
                 "RUT",
                 "MATRICULA",
                 "MEDICAL_FOLIO",
@@ -343,8 +361,12 @@ def detect_pii(texto: str) -> Dict[str, Any]:
                 "end": end
             })
 
-    # Deduplicar superposiciones (conservar la coincidencia más larga en cada posición)
-    entities.sort(key=lambda x: (x.get("start", 0), -(x.get("end", 0) - x.get("start", 0) if "start" in x and "end" in x else 0)))
+    # Deduplicar superposiciones (conservar la coincidencia más larga, priorizando tipos específicos)
+    entities.sort(key=lambda x: (
+        x.get("start", 0),
+        get_entity_priority(x.get("type", "")),
+        -(x.get("end", 0) - x.get("start", 0) if "start" in x and "end" in x else 0)
+    ))
     dedup_entities = []
     for item in entities:
         overlap = False
