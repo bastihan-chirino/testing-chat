@@ -168,7 +168,7 @@ else:
                 for doc_name, detection in pii_summary["documents"].items():
                     if detection["found"]:
                         st.warning(f"**{doc_name}**: {detection['summary']}")
-                        st.caption(f"DEBUG: método = {detection.get('debug', 'desconocido')}")
+
                         for entity in detection["entities"]:
                             st.caption(
                                 f"  - {entity['type']}: '{entity['text']}' "
@@ -275,10 +275,7 @@ def render_pii_warning(pii_check: dict, original_prompt: str = "") -> None:
             st.code(original_prompt, language=None)
 
     if high_confidence_types:
-        st.warning(
-            "Tipos de datos detectados con alta confianza "
-            f"(>{HIGH_CONFIDENCE_THRESHOLD:.2f}):"
-        )
+        st.warning("Tipos de datos detectados:")
         for data_type in high_confidence_types:
             st.markdown(f"- **{data_type}**")
     else:
@@ -287,7 +284,7 @@ def render_pii_warning(pii_check: dict, original_prompt: str = "") -> None:
             f"la confianza de {HIGH_CONFIDENCE_THRESHOLD:.2f}."
         )
 
-    st.caption(f"DEBUG: método = {pii_check.get('debug', 'desconocido')}")
+
     with st.expander("Ver detalles"):
         st.write(
             "Estos datos pueden ser personales, financieros o identificables, "

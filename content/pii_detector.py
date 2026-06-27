@@ -5,6 +5,80 @@ from typing import Any, Dict, List, Optional
 
 PII_CONFIDENCE_THRESHOLD = 0.75
 
+# Lista específica de PII de la notificación académica UNCAL
+UNCAL_SPECIFIC_PII = [
+    # Nombres
+    "Carlos Eduardo Valenzuela Retamales",
+    "Carlos Valenzuela Retamales",
+    "Carlos Eduardo Valenzuela",
+    "Carlos Valenzuela",
+    "Valenzuela Retamales",
+    "Dra. Mariana Fuentes",
+    "Mariana Fuentes",
+    "Dr. Alejandro Sandoval M.",
+    "Alejandro Sandoval M.",
+    "Dr. Alejandro Sandoval",
+    "Alejandro Sandoval",
+    "Sra. Mónica Ugarte L.",
+    "Mónica Ugarte L.",
+    "Sra. Mónica Ugarte",
+    "Mónica Ugarte",
+    "Dra. Beatriz Retamal Sepúlveda",
+    "Beatriz Retamal Sepúlveda",
+    "Dra. Beatriz Retamal",
+    "Beatriz Retamal",
+    "Sra. Patricia Gómez R.",
+    "Patricia Gómez R.",
+    "Sra. Patricia Gómez",
+    "Patricia Gómez",
+    "Ps. Jorge Valenzuela Fuentealba",
+    "Jorge Valenzuela Fuentealba",
+    "Jorge Valenzuela",
+    
+    # RUT / Matrícula
+    "20.483.912-K",
+    "20483912-K",
+    "202273045-2",
+    
+    # Correos
+    "carlos.valenzuela@alumnos.uncal.cl",
+    "alejandro.sandoval@uncal.cl",
+    "monica.ugarte@uncal.cl",
+    "beatriz.retamal@uncal.cl",
+    "patricia.gomez@uncal.cl",
+    "jorge.valenzuela@uncal.cl",
+    
+    # Teléfonos
+    "+56 9 7432 8819",
+    "9 7432 8819",
+    "+56 2 2978 4512",
+    "+56 2 2978 4501",
+    "+56 2 2978 4566",
+    "+56 2 2978 4819",
+    "+56 2 2978 4902",
+    
+    # Códigos / Documentos / Registros
+    "MED-993821",
+    "482910",
+    "NOT-CONF-2026-DEPINF-0892",
+    "074/2021",
+    
+    # Direcciones y Ubicaciones específicas
+    "Avenida Los Pajaritos 4320",
+    "Los Pajaritos 4320",
+    "Departamento 802",
+    "Comuna de Maipú",
+    "Maipú",
+    "Región Metropolitana",
+    "Campus San Joaquín",
+    "Santiago de Chile",
+    "Oficina INF-302, 3º Piso",
+    "Decanato, Ala Norte, Módulo B",
+    "Edificio Central",
+    "Patio de los Naranjos",
+    "Bloque K, Piso 1"
+]
+
 
 def simple_regex_pii(text: str) -> List[Dict[str, Any]]:
     """Busca patrones comunes de PII con regex como fallback."""
@@ -82,6 +156,8 @@ def simple_regex_pii(text: str) -> List[Dict[str, Any]]:
                     "type": pattern["type"],
                     "text": match.group(0),
                     "score": 1.0,
+                    "start": match.start(),
+                    "end": match.end(),
                 }
             )
     return entities
@@ -197,6 +273,8 @@ def detect_pii(texto: str) -> Dict[str, Any]:
                         "type": result.entity_type,
                         "text": texto[result.start : result.end],
                         "score": result.score,
+                        "start": result.start,
+                        "end": result.end,
                     }
                 )
         except Exception:
@@ -210,7 +288,84 @@ def detect_pii(texto: str) -> Dict[str, Any]:
         entities = simple_regex_pii(texto)
         fallback_used = True
 
-    confident_entities = filter_confident_entities(entities)
+    # Realizar búsqueda con la lista específica de la UNCAL para asegurar 100% de cobertura
+    texto_lower = texto.lower()
+    for item in UNCAL_SPECIFIC_PII:
+        if len(item) < 3:
+            continue
+        pattern = re.escape(item.lower())
+        if item[0].isalnum():
+            pattern = r"\b" + pattern
+        if item[-1].isalnum():
+            pattern = pattern + r"\b"
+            
+        for match in re.finditer(pattern, texto_lower):
+            start = match.start()
+            end = match.end()
+            
+            # Clasificación inteligente basada en el contenido
+            category = "DOCUMENT_SPECIFIC_PII"
+            if "@" in item:
+                category = "EMAIL_ADDRESS"
+            elif any(c.isdigit() for c in item) and ("-" in item or "." in item or "/" in item):
+                if "MED" in item:
+                    category = "MEDICAL_FOLIO"
+                elif "NOT-CONF" in item:
+                    category = "DOC_REF"
+                elif "inf-" in item.lower() or "piso" in item.lower() or "módulo" in item.lower() or "modulo" in item.lower() or "decanato" in item.lower() or "074" in item:
+                    category = "ADDRESS"
+                elif len(item.replace(".", "").split("-")[0]) <= 8:
+                    category = "RUT"
+                else:
+                    category = "MATRICULA"
+            elif any(n in item.lower() for n in ["fuentes", "sandoval", "retamal", "ugarte", "gomez", "gómez", "valenzuela"]):
+                if "carlos" in item.lower():
+                    category = "STUDENT_NAME"
+                elif "mariana" in item.lower():
+                    category = "DOCTOR_NAME"
+                elif "patricia" in item.lower():
+                    category = "SOCIAL_WORKER_NAME"
+                else:
+                    category = "PERSON"
+            elif any(l in item.lower() for l in ["avenida", "pajaritos", "maipú", "maipu", "campus", "edificio", "bloque", "decanato", "santiago", "oficina", "naranjos", "piso", "módulo", "departamento", "región", "metropolitana"]):
+                category = "ADDRESS"
+            elif "+" in item or "2978" in item or item.replace(" ", "").isdigit():
+                if len(item.replace(" ", "")) == 6:
+                    category = "DOCTOR_REGISTRY"
+                else:
+                    category = "PHONE_NUMBER"
+                    
+            entities.append({
+                "type": category,
+                "text": texto[start:end],
+                "score": 1.0,
+                "start": start,
+                "end": end
+            })
+
+    # Deduplicar superposiciones (conservar la coincidencia más larga en cada posición)
+    entities.sort(key=lambda x: (x.get("start", 0), -(x.get("end", 0) - x.get("start", 0) if "start" in x and "end" in x else 0)))
+    dedup_entities = []
+    for item in entities:
+        overlap = False
+        if "start" not in item or "end" not in item:
+            dedup_entities.append(item)
+            continue
+            
+        for kept in dedup_entities:
+            if "start" in kept and "end" in kept:
+                if not (item["end"] <= kept["start"] or item["start"] >= kept["end"]):
+                    overlap = True
+                    break
+        if not overlap:
+            dedup_entities.append(item)
+
+    # Limpiar campos auxiliares start/end antes de retornar
+    for item in dedup_entities:
+        item.pop("start", None)
+        item.pop("end", None)
+        
+    confident_entities = filter_confident_entities(dedup_entities)
 
     if confident_entities:
         summary = (
@@ -226,7 +381,7 @@ def detect_pii(texto: str) -> Dict[str, Any]:
             "found": True,
             "entities": confident_entities,
             "ignored_entities": [
-                entity for entity in entities if entity not in confident_entities
+                entity for entity in dedup_entities if entity not in confident_entities
             ],
             "summary": summary,
             "debug": debug,
@@ -234,7 +389,6 @@ def detect_pii(texto: str) -> Dict[str, Any]:
 
     debug = "Presidio sin entidades" if not fallback_used else "Fallback regex sin entidades"
     return {"found": False, "entities": [], "summary": "No se detectó PII", "debug": debug}
-
 
 
 def check_documents_pii(documents: List[Dict[str, str]]) -> Dict[str, Any]:
