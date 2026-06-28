@@ -28,12 +28,24 @@ def parse_startup_options() -> argparse.Namespace:
         action="store_true",
         help="Habilita la subida de documentos desde la barra lateral.",
     )
+    parser.add_argument(
+        "--enable-presidio",
+        action="store_true",
+        help="Habilita el uso de Presidio Analyzer para la detección de PII.",
+    )
+    parser.add_argument(
+        "--only-pii-list",
+        action="store_true",
+        help="Restringe la detección de PII únicamente a los elementos de la lista específica de la UNCAL.",
+    )
     return parser.parse_known_args(sys.argv[1:])[0]
 
 
 STARTUP_OPTIONS = parse_startup_options()
 PII_WARNINGS_ENABLED = not STARTUP_OPTIONS.disable_pii_warnings
 DOCUMENT_UPLOAD_ENABLED = STARTUP_OPTIONS.enable_document_upload
+PRESIDIO_ENABLED = STARTUP_OPTIONS.enable_presidio
+ONLY_PII_LIST = STARTUP_OPTIONS.only_pii_list
 
 
 st.set_page_config(page_title="Chatbot IA", page_icon="🤖")
@@ -136,7 +148,7 @@ if DOCUMENT_UPLOAD_ENABLED:
                 )
                 st.sidebar.success(f"✓ {uploaded_file.name} cargado")
 
-                pii_check = detect_pii(content)
+                pii_check = detect_pii(content, enable_presidio=PRESIDIO_ENABLED, only_pii_list=ONLY_PII_LIST)
                 if pii_check["found"]:
                     st.sidebar.warning(
                         f"⚠️ PII detectado en {uploaded_file.name}: {pii_check['summary']}"
@@ -151,23 +163,14 @@ if DOCUMENT_UPLOAD_ENABLED:
     if st.session_state.documents:
         st.sidebar.subheader("Documentos cargados:")
 
-        pii_summary = check_documents_pii(st.session_state.documents)
+        pii_summary = check_documents_pii(st.session_state.documents, enable_presidio=PRESIDIO_ENABLED, only_pii_list=ONLY_PII_LIST)
         if pii_summary["has_pii"]:
             st.sidebar.error("🚨 Se detectó PII en algunos documentos")
             st.sidebar.write(
                 "Algunos archivos cargados contienen datos personales o sensibles. "
                 "Para evitar filtraciones, no incluyas esos datos en prompts ni los envíes a la IA."
             )
-            with st.sidebar.expander("Ver detalles"):
-                for doc_name, detection in pii_summary["documents"].items():
-                    if detection["found"]:
-                        st.warning(f"**{doc_name}**: {detection['summary']}")
 
-                        for entity in detection["entities"]:
-                            st.caption(
-                                f"  - {entity['type']}: '{entity['text']}' "
-                                f"(confianza: {entity['score']:.2f})"
-                            )
 
         for i, doc in enumerate(st.session_state.documents):
             col1, col2 = st.sidebar.columns([3, 1])
@@ -238,15 +241,10 @@ PII_TYPE_LABELS = {
     "MEDICAL_FOLIO": "Folio de certificado médico",
     "DOC_REF": "Código de documento institucional",
     "DOCTOR_REGISTRY": "Registro médico",
-    "STUDENT_NAME": "Nombre de estudiante",
-    "DOCTOR_NAME": "Nombre de médico",
-    "SOCIAL_WORKER_NAME": "Nombre de asistente social",
     "ADDRESS": "Dirección/Domicilio",
     "PHONE_NUMBER_CL": "Teléfono",
     "PERSON": "Nombre de persona",
-    "PER": "Nombre de persona",
     "LOCATION": "Ubicación geográfica",
-    "LOC": "Ubicación geográfica",
 }
 
 
@@ -261,7 +259,17 @@ def get_high_confidence_pii_types(pii_check: dict) -> list[str]:
 
 
 def render_pii_warning(pii_check: dict, original_prompt: str = "") -> None:
-    high_confidence_types = get_high_confidence_pii_types(pii_check)
+    # Agrupar entidades por su etiqueta legible y recolectar sus valores correspondientes
+    grouped_entities = {}
+    for entity in pii_check.get("entities", []):
+        if entity.get("score", 0) >= HIGH_CONFIDENCE_THRESHOLD:
+            entity_type = entity["type"]
+            friendly_label = PII_TYPE_LABELS.get(entity_type, entity_type)
+            text_value = entity["text"]
+            
+            if friendly_label not in grouped_entities:
+                grouped_entities[friendly_label] = set()
+            grouped_entities[friendly_label].add(text_value)
 
     st.error(
         "❌ Se detectó información sensible en tu mensaje. "
@@ -272,10 +280,11 @@ def render_pii_warning(pii_check: dict, original_prompt: str = "") -> None:
         with st.expander("Ver mensaje original", expanded=True):
             st.code(original_prompt, language=None)
 
-    if high_confidence_types:
+    if grouped_entities:
         st.warning("Tipos de datos detectados:")
-        for data_type in high_confidence_types:
-            st.markdown(f"- **{data_type}**")
+        for label, values in sorted(grouped_entities.items()):
+            values_str = ", ".join(f"`{val}`" for val in sorted(values))
+            st.markdown(f"- **{label}**: {values_str}")
     else:
         st.warning(
             "Se detectaron posibles datos sensibles, pero ningún tipo superó "
@@ -283,19 +292,27 @@ def render_pii_warning(pii_check: dict, original_prompt: str = "") -> None:
         )
 
 
-    with st.expander("Ver detalles"):
-        st.write(
-            "Estos datos pueden ser personales, financieros o identificables, "
-            "y por seguridad no deben exponerse a servicios externos."
-        )
-        for entity in pii_check["entities"]:
-            st.caption(
-                f"  - {entity['type']}: '{entity['text']}' "
-                f"(confianza: {entity['score']:.2f})"
-            )
+
 
 
 prompt = st.chat_input("Escribe algo aquí...")
+
+if prompt:
+    if st.session_state.pending_prompt:
+        add_conversation_event(
+            st.session_state.messages,
+            {
+                "content": "Se descartó la advertencia de PII anterior al enviar un nuevo mensaje.",
+                "event_type": "pii_warning_discarded",
+                "details": {
+                    "discarded_prompt": st.session_state.pending_prompt,
+                    "new_prompt": prompt,
+                },
+            },
+            st.session_state.conversation_file_path,
+        )
+    st.session_state.pending_prompt = None
+    st.session_state.pending_pii_check = None
 
 if not PII_WARNINGS_ENABLED and st.session_state.pending_prompt:
     prompt_to_send = st.session_state.pending_prompt
@@ -330,7 +347,7 @@ elif should_process_new_prompt(prompt, st.session_state.pending_prompt):
         process_prompt(prompt)
         st.stop()
 
-    decision = decide_prompt_action(prompt)
+    decision = decide_prompt_action(prompt, enable_presidio=PRESIDIO_ENABLED, only_pii_list=ONLY_PII_LIST)
     pii_check = decision["pii_check"]
 
     if decision["action"] == "warn":

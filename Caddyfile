@@ -1,0 +1,4 @@
+:8000 {
+    reverse_proxy /con-alerta* localhost:8501
+    reverse_proxy /sin-alerta* localhost:8502
+}

@@ -103,7 +103,7 @@ def get_ai_response(
         config = types.GenerateContentConfig(
             temperature=1,
             top_p=1,
-            max_output_tokens=2048,
+            max_output_tokens=8192,
         )
 
         response = client.models.generate_content(

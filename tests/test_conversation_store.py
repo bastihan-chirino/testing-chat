@@ -77,6 +77,30 @@ class ConversationStoreTests(unittest.TestCase):
             )
             self.assertEqual([item["id"] for item in loaded], [1, 2])
 
+    def test_pii_warning_discarded_event(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_path = os.path.join(tmpdir, "conversation.json")
+            messages = []
+
+            add_conversation_event(
+                messages,
+                {
+                    "content": "Se descartó la advertencia de PII anterior al enviar un nuevo mensaje.",
+                    "event_type": "pii_warning_discarded",
+                    "details": {
+                        "discarded_prompt": "correo: persona@example.com",
+                        "new_prompt": "mensaje limpio"
+                    }
+                },
+                file_path
+            )
+
+            loaded = load_conversations(file_path)
+            self.assertEqual(len(loaded), 1)
+            self.assertEqual(loaded[0]["event_type"], "pii_warning_discarded")
+            self.assertEqual(loaded[0]["details"]["discarded_prompt"], "correo: persona@example.com")
+            self.assertEqual(loaded[0]["details"]["new_prompt"], "mensaje limpio")
+
     def test_should_process_new_prompt_ignores_stale_input_while_pending(self) -> None:
         self.assertFalse(should_process_new_prompt("mensaje con pii", "mensaje pendiente"))
         self.assertTrue(should_process_new_prompt("mensaje nuevo", None))

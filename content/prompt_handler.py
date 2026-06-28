@@ -1,9 +1,14 @@
 from pii_detector import detect_pii
 
 
-def decide_prompt_action(prompt: str, allow_pii: bool = False) -> dict:
+def decide_prompt_action(
+    prompt: str,
+    allow_pii: bool = False,
+    enable_presidio: bool = False,
+    only_pii_list: bool = False,
+) -> dict:
     """Decide whether a prompt should be sent or blocked based on PII detection."""
-    pii_check = detect_pii(prompt)
+    pii_check = detect_pii(prompt, enable_presidio=enable_presidio, only_pii_list=only_pii_list)
     if pii_check["found"] and not allow_pii:
         return {"action": "warn", "pii_check": pii_check}
     return {"action": "send", "pii_check": pii_check}

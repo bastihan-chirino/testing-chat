@@ -50,7 +50,6 @@ UNCAL_SPECIFIC_PII = [
     
     # Teléfonos
     "+56 9 7432 8819",
-    "9 7432 8819",
     "+56 2 2978 4512",
     "+56 2 2978 4501",
     "+56 2 2978 4566",
@@ -66,18 +65,24 @@ UNCAL_SPECIFIC_PII = [
     # Direcciones y Ubicaciones específicas
     "Avenida Los Pajaritos 4320",
     "Los Pajaritos 4320",
-    "Departamento 802",
-    "Comuna de Maipú",
-    "Maipú",
     "Región Metropolitana",
     "Campus San Joaquín",
     "Santiago de Chile",
-    "Oficina INF-302, 3º Piso",
-    "Decanato, Ala Norte, Módulo B",
-    "Edificio Central",
-    "Patio de los Naranjos",
-    "Bloque K, Piso 1"
+    "Patio de los Naranjos"
 ]
+
+EXCLUDED_NON_PII = {
+    "bloque k, piso 1",
+    "decanato, ala norte, módulo b",
+    "decanato, ala norte, modulo b",
+    "departamento 802",
+    "edificio central",
+    "maipú",
+    "maipu",
+    "oficina inf-302, 3º piso",
+    "comuna de maipú",
+    "comuna de maipu",
+}
 
 
 def simple_regex_pii(text: str) -> List[Dict[str, Any]]:
@@ -89,7 +94,7 @@ def simple_regex_pii(text: str) -> List[Dict[str, Any]]:
         },
         {
             "type": "PHONE_NUMBER",
-            "pattern": r"\b(?:\+\d{1,3}[\s-]?)?(?:\d{2,4}[\s-]?){2,4}\d{2,4}\b",
+            "pattern": r"\+(?:\d{1,3}[\s-]?)?(?:\d{2,4}[\s-]?){2,4}\d{2,4}\b",
         },
         {
             "type": "DNI/NIE",
@@ -128,16 +133,16 @@ def simple_regex_pii(text: str) -> List[Dict[str, Any]]:
             "pattern": r"\b482910\b",
         },
         {
-            "type": "STUDENT_NAME",
-            "pattern": r"\bCarlos\s+Eduardo\s+Valenzuela(?:\s+Retamales)?\b|\bCarlos\s+Valenzuela(?:\s+Retamales)?\b",
-        },
-        {
-            "type": "DOCTOR_NAME",
-            "pattern": r"\bMariana\s+Fuentes\b",
-        },
-        {
-            "type": "SOCIAL_WORKER_NAME",
-            "pattern": r"\bPatricia\s+G(?:ó|o)mez\b",
+            "type": "PERSON",
+            "pattern": (
+                r"\bCarlos(?:\s+Eduardo)?\s+Valenzuela(?:\s+Retamales)?\b|"
+                r"\b(?:Dra?\.?\s+)?Mariana\s+Fuentes\b|"
+                r"\b(?:Dr\.?\s+)?Alejandro\s+Sandoval(?:\s+M\.?)?\b|"
+                r"\b(?:Sra?\.?\s+)?M(?:ó|o)nica\s+Ugarte(?:\s+L\.?)?\b|"
+                r"\b(?:Dra?\.?\s+)?Beatriz\s+Retamal(?:\s+Sep(?:ú|u)lveda)?\b|"
+                r"\b(?:Sra?\.?\s+)?Patricia\s+G(?:ó|o)mez(?:\s+R\.?)?\b|"
+                r"\b(?:Ps\.?\s+)?Jorge\s+Valenzuela(?:\s+Fuentealba)?\b"
+            ),
         },
         {
             "type": "ADDRESS",
@@ -145,7 +150,7 @@ def simple_regex_pii(text: str) -> List[Dict[str, Any]]:
         },
         {
             "type": "PHONE_NUMBER_CL",
-            "pattern": r"\+56\s*9\s*\d{4}\s*\d{4}\b|\b9\s*\d{4}\s*\d{4}\b",
+            "pattern": r"\+56\s*9\s*\d{4}\s*\d{4}\b",
         },
     ]
     entities = []
@@ -212,11 +217,21 @@ def build_presidio_analyzer() -> Optional[object]:
         medical_folio_pattern = Pattern(name="medical_folio", regex=r"\bMED-\d{6}\b", score=1.0)
         doc_ref_pattern = Pattern(name="doc_ref", regex=r"\bNOT-CONF-\d{4}-DEPINF-\d{4}\b", score=1.0)
         doctor_registry_pattern = Pattern(name="doctor_registry", regex=r"\b482910\b", score=1.0)
-        student_name_pattern = Pattern(name="student_name", regex=r"\bCarlos\s+Eduardo\s+Valenzuela(?:\s+Retamales)?\b|\bCarlos\s+Valenzuela(?:\s+Retamales)?\b", score=1.0)
-        doctor_name_pattern = Pattern(name="doctor_name", regex=r"\bMariana\s+Fuentes\b", score=1.0)
-        social_worker_pattern = Pattern(name="social_worker", regex=r"\bPatricia\s+G(?:ó|o)mez\b", score=1.0)
+        person_pattern = Pattern(
+            name="person_pattern",
+            regex=(
+                r"\bCarlos(?:\s+Eduardo)?\s+Valenzuela(?:\s+Retamales)?\b|"
+                r"\b(?:Dra?\.?\s+)?Mariana\s+Fuentes\b|"
+                r"\b(?:Dr\.?\s+)?Alejandro\s+Sandoval(?:\s+M\.?)?\b|"
+                r"\b(?:Sra?\.?\s+)?M(?:ó|o)nica\s+Ugarte(?:\s+L\.?)?\b|"
+                r"\b(?:Dra?\.?\s+)?Beatriz\s+Retamal(?:\s+Sep(?:ú|u)lveda)?\b|"
+                r"\b(?:Sra?\.?\s+)?Patricia\s+G(?:ó|o)mez(?:\s+R\.?)?\b|"
+                r"\b(?:Ps\.?\s+)?Jorge\s+Valenzuela(?:\s+Fuentealba)?\b"
+            ),
+            score=1.0
+        )
         address_pattern = Pattern(name="address", regex=r"\bAvenida\s+Los\s+Pajaritos\s+4320\b|\bLos\s+Pajaritos\s+4320\b", score=1.0)
-        phone_cl_pattern = Pattern(name="phone_cl", regex=r"\+56\s*9\s*\d{4}\s*\d{4}\b|\b9\s*\d{4}\s*\d{4}\b", score=1.0)
+        phone_cl_pattern = Pattern(name="phone_cl", regex=r"\+56\s*9\s*\d{4}\s*\d{4}\b", score=1.0)
         
         # Patrones para DNI/NIE e IBAN
         dni_pattern = Pattern(name="dni_nie", regex=r"\b\d{7,8}[A-Z]?\b", score=1.0)
@@ -228,9 +243,7 @@ def build_presidio_analyzer() -> Optional[object]:
             analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="MEDICAL_FOLIO", patterns=[medical_folio_pattern], supported_language=lang))
             analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="DOC_REF", patterns=[doc_ref_pattern], supported_language=lang))
             analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="DOCTOR_REGISTRY", patterns=[doctor_registry_pattern], supported_language=lang))
-            analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="STUDENT_NAME", patterns=[student_name_pattern], supported_language=lang))
-            analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="DOCTOR_NAME", patterns=[doctor_name_pattern], supported_language=lang))
-            analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="SOCIAL_WORKER_NAME", patterns=[social_worker_pattern], supported_language=lang))
+            analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="PERSON", patterns=[person_pattern], supported_language=lang))
             analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="ADDRESS", patterns=[address_pattern], supported_language=lang))
             analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="PHONE_NUMBER_CL", patterns=[phone_cl_pattern], supported_language=lang))
             analyzer.registry.add_recognizer(PatternRecognizer(supported_entity="DNI/NIE", patterns=[dni_pattern], supported_language=lang))
@@ -244,67 +257,85 @@ def build_presidio_analyzer() -> Optional[object]:
 
 def get_entity_priority(entity_type: str) -> int:
     """Retorna la prioridad de la entidad: menor valor es mayor prioridad."""
-    # Las entidades genéricas de NER tienen menor prioridad
-    if entity_type in {"PERSON", "LOCATION", "ORG", "PER", "LOC"}:
+    # Las entidades genéricas de NER y regex básicas tienen menor prioridad
+    if entity_type in {
+        "PERSON",
+        "LOCATION",
+        "ORG",
+        "PER",
+        "LOC",
+        "PHONE_NUMBER",
+        "EMAIL_ADDRESS",
+        "IP_ADDRESS",
+        "URL",
+        "CREDIT_CARD",
+    }:
         return 2
     return 1
 
 
-def detect_pii(texto: str) -> Dict[str, Any]:
+def detect_pii(
+    texto: str,
+    enable_presidio: bool = False,
+    only_pii_list: bool = False,
+) -> Dict[str, Any]:
     """Detecta información personal identificable en el texto."""
+    # Reemplazar saltos de línea y normalizar espacios múltiples para robustecer la detección
+    texto = re.sub(r'\s+', ' ', texto.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' '))
     entities = []
     fallback_used = False
 
-    analyzer = build_presidio_analyzer()
-    if analyzer:
-        try:
-            supported_entities = [
-                "PHONE_NUMBER",
-                "EMAIL_ADDRESS",
-                "CREDIT_CARD",
-                "IP_ADDRESS",
-                "URL",
-                "PERSON",
-                "LOCATION",
-                "DNI/NIE",
-                "IBAN",
-                "RUT",
-                "MATRICULA",
-                "MEDICAL_FOLIO",
-                "DOC_REF",
-                "DOCTOR_REGISTRY",
-                "STUDENT_NAME",
-                "DOCTOR_NAME",
-                "SOCIAL_WORKER_NAME",
-                "ADDRESS",
-                "PHONE_NUMBER_CL",
-            ]
-            lang = "es" if "es" in analyzer.supported_languages else "en"
-            results = analyzer.analyze(
-                text=texto,
-                entities=supported_entities,
-                language=lang,
-            )
-            for result in results:
-                entities.append(
-                    {
-                        "type": result.entity_type,
-                        "text": texto[result.start : result.end],
-                        "score": result.score,
-                        "start": result.start,
-                        "end": result.end,
-                    }
-                )
-        except Exception:
+    if not only_pii_list:
+        if enable_presidio:
+            analyzer = build_presidio_analyzer()
+            if analyzer:
+                try:
+                    supported_entities = [
+                        "PHONE_NUMBER",
+                        "EMAIL_ADDRESS",
+                        "CREDIT_CARD",
+                        "IP_ADDRESS",
+                        "URL",
+                        "PERSON",
+                        "LOCATION",
+                        "DNI/NIE",
+                        "IBAN",
+                        "RUT",
+                        "MATRICULA",
+                        "MEDICAL_FOLIO",
+                        "DOC_REF",
+                        "DOCTOR_REGISTRY",
+                        "ADDRESS",
+                        "PHONE_NUMBER_CL",
+                    ]
+                    lang = "es" if "es" in analyzer.supported_languages else "en"
+                    results = analyzer.analyze(
+                        text=texto,
+                        entities=supported_entities,
+                        language=lang,
+                    )
+                    for result in results:
+                        entities.append(
+                            {
+                                "type": result.entity_type,
+                                "text": texto[result.start : result.end],
+                                "score": result.score,
+                                "start": result.start,
+                                "end": result.end,
+                            }
+                        )
+                except Exception:
+                    fallback_used = True
+                    entities = simple_regex_pii(texto)
+            else:
+                fallback_used = True
+                entities = simple_regex_pii(texto)
+        else:
             fallback_used = True
             entities = simple_regex_pii(texto)
     else:
-        fallback_used = True
-        entities = simple_regex_pii(texto)
-
-    if not entities and not fallback_used:
-        entities = simple_regex_pii(texto)
-        fallback_used = True
+        # En modo only_pii_list, no usamos el fallback general simple_regex_pii
+        pass
 
     # Realizar búsqueda con la lista específica de la UNCAL para asegurar 100% de cobertura
     texto_lower = texto.lower()
@@ -328,30 +359,22 @@ def detect_pii(texto: str) -> Dict[str, Any]:
             elif any(c.isdigit() for c in item) and ("-" in item or "." in item or "/" in item):
                 if "MED" in item:
                     category = "MEDICAL_FOLIO"
-                elif "NOT-CONF" in item:
+                elif "NOT-CONF" in item or "074" in item:
                     category = "DOC_REF"
-                elif "inf-" in item.lower() or "piso" in item.lower() or "módulo" in item.lower() or "modulo" in item.lower() or "decanato" in item.lower() or "074" in item:
+                elif "inf-" in item.lower() or "piso" in item.lower() or "módulo" in item.lower() or "modulo" in item.lower() or "decanato" in item.lower():
                     category = "ADDRESS"
                 elif len(item.replace(".", "").split("-")[0]) <= 8:
                     category = "RUT"
                 else:
                     category = "MATRICULA"
             elif any(n in item.lower() for n in ["fuentes", "sandoval", "retamal", "ugarte", "gomez", "gómez", "valenzuela"]):
-                if "carlos" in item.lower():
-                    category = "STUDENT_NAME"
-                elif "mariana" in item.lower():
-                    category = "DOCTOR_NAME"
-                elif "patricia" in item.lower():
-                    category = "SOCIAL_WORKER_NAME"
-                else:
-                    category = "PERSON"
+                category = "PERSON"
             elif any(l in item.lower() for l in ["avenida", "pajaritos", "maipú", "maipu", "campus", "edificio", "bloque", "decanato", "santiago", "oficina", "naranjos", "piso", "módulo", "departamento", "región", "metropolitana"]):
                 category = "ADDRESS"
-            elif "+" in item or "2978" in item or item.replace(" ", "").isdigit():
-                if len(item.replace(" ", "")) == 6:
-                    category = "DOCTOR_REGISTRY"
-                else:
-                    category = "PHONE_NUMBER"
+            elif item.replace(" ", "").isdigit() and len(item.replace(" ", "")) == 6:
+                category = "DOCTOR_REGISTRY"
+            elif item.startswith("+"):
+                category = "PHONE_NUMBER"
                     
             entities.append({
                 "type": category,
@@ -388,6 +411,12 @@ def detect_pii(texto: str) -> Dict[str, Any]:
         item.pop("end", None)
         
     confident_entities = filter_confident_entities(dedup_entities)
+    
+    # Filtrar entidades que contengan texto excluido que no sea PII
+    confident_entities = [
+        entity for entity in confident_entities
+        if entity["text"].lower().strip().rstrip(",") not in EXCLUDED_NON_PII
+    ]
 
     if confident_entities:
         summary = (
@@ -413,13 +442,17 @@ def detect_pii(texto: str) -> Dict[str, Any]:
     return {"found": False, "entities": [], "summary": "No se detectó PII", "debug": debug}
 
 
-def check_documents_pii(documents: List[Dict[str, str]]) -> Dict[str, Any]:
+def check_documents_pii(
+    documents: List[Dict[str, str]],
+    enable_presidio: bool = False,
+    only_pii_list: bool = False,
+) -> Dict[str, Any]:
     """Revisa si hay PII en los documentos cargados."""
     results = {}
     total_found = False
 
     for doc in documents:
-        detection = detect_pii(doc["content"])
+        detection = detect_pii(doc["content"], enable_presidio=enable_presidio, only_pii_list=only_pii_list)
         if detection["found"]:
             total_found = True
         results[doc["name"]] = detection
