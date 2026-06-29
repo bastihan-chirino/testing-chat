@@ -1,0 +1,18 @@
+=== METRICAS GLOBALES ===
+Metrica,Total
+Archivos JSON Analizados,11
+Mensajes Bloqueados (pii_blocked),17
+Reintentos (retry_after_pii),13
+
+=== DESGLOSE DE CATEGORIAS PII ===
+Categoria PII,Frecuencia (Veces Detectada)
+PERSON,17
+ADDRESS,12
+DOC_REF,12
+MEDICAL_FOLIO,8
+EMAIL_ADDRESS,6
+PHONE_NUMBER,6
+DOCTOR_REGISTRY,3
+MATRICULA,1
+PHONE_NUMBER_CL,1
+RUT,1

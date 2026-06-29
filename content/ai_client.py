@@ -13,12 +13,14 @@ def get_available_models(client) -> List[str]:
 
 
 def select_cheapest_model(available_models: List[str]) -> Optional[str]:
-    """Selecciona el modelo más barato de la lista disponible."""
+    """Selecciona el modelo de mejor calidad disponible en la lista."""
     preference_keywords = [
+        "gemini-2.5-pro",
+        "gemini-2.0-pro-exp",
+        "gemini-1.5-pro",
         "gemini-2.5-flash",
         "gemini-2.0-flash",
         "gemini-1.5-flash",
-        "gemini-1.5-pro",
         "gemini-pro",
     ]
 
