@@ -15,6 +15,8 @@ py -3 -m venv venv
 .\venv\Scripts\activate
 ```
 
+Es necesario crear una variable de entorno llamada GEMINI_API_KEY para que funcione.
+
 Instalar dependencias:
 
 ```powershell
@@ -22,6 +24,11 @@ python -m pip install --upgrade pip
 python -m pip install streamlit google-genai PyPDF2 python-docx presidio-analyzer
 ```
 
+Se utiliza para disponibilizar la url a navegadores.
+
+```powershell
+ngrok http PORT
+```
 
 ## Ejecutar la aplicación
 
